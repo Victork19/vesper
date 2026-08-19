@@ -10,11 +10,11 @@ Push the repository to GitHub. Keep credentials out of Git: API keys, wallet key
 
 Use Ubuntu 22.04 or newer with an Elastic IP. Point `vesper-scar.duckdns.org` to the EC2 Elastic IP. Allow only SSH from your IP, and ports 80 and 443 publicly. Do not expose port 8000 publicly.
 
-Install Docker and Nginx:
+Install Docker and DNS tools. Nginx runs inside Docker, so a host Nginx service is not required:
 
 ```bash
 sudo apt update
-sudo apt install -y ca-certificates curl git nginx
+sudo apt install -y ca-certificates curl git dnsutils
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker "$USER"
 newgrp docker
@@ -32,7 +32,7 @@ nano backend/.env
 Set at least:
 
 ```env
-CORS_ORIGINS=https://YOUR_PROJECT.pages.dev
+CORS_ORIGINS=https://vesper-scar.pages.dev
 SIBYL_OFFICIAL=1
 SIBYL_DB_PATH=/app/data/vesper.db
 GROQ_API_KEY=your_key
@@ -67,7 +67,7 @@ curl http://127.0.0.1:8000/health
 
 The API documentation is available at `/docs`.
 
-## 5. DuckDNS, Nginx, and HTTPS
+## 5. DuckDNS and containerized Nginx
 
 In DuckDNS, create a subdomain and set its IPv4 address to your EC2 Elastic IP:
 
@@ -84,21 +84,30 @@ dig +short vesper-scar.duckdns.org
 
 The result should be your EC2 Elastic IP.
 
-Copy the included config, replace `api.example.com` with your DuckDNS hostname, and enable it:
+The Compose stack includes Nginx and exposes ports 80 and 443. Do not install or enable a second host Nginx service. The initial configuration is HTTP-only so Certbot can validate the hostname.
+
+Start the stack:
 
 ```bash
-sudo cp deploy/nginx.conf /etc/nginx/sites-available/vesper-api
-sudo nano /etc/nginx/sites-available/vesper-api
-sudo ln -s /etc/nginx/sites-available/vesper-api /etc/nginx/sites-enabled/vesper-api
-sudo nginx -t
-sudo systemctl reload nginx
+docker compose -f backend/docker-compose.yml up -d --build
 ```
 
-Create a DNS `A` record pointing `api.yourdomain.com` to the EC2 Elastic IP, then install HTTPS:
+Request the certificate through the included Certbot container:
 
 ```bash
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d vesper-scar.duckdns.org
+docker compose -f backend/docker-compose.yml run --rm certbot certonly --webroot -w /var/www/certbot -d vesper-scar.duckdns.org --email YOUR_EMAIL --agree-tos --no-eff-email
+```
+
+Switch Nginx to the HTTPS configuration:
+
+```bash
+cp deploy/nginx-https.conf deploy/nginx.conf
+docker compose -f backend/docker-compose.yml up -d nginx
+```
+
+Verify HTTPS:
+
+```bash
 curl https://vesper-scar.duckdns.org/health
 ```
 
