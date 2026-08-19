@@ -5,7 +5,10 @@ services:
     env_file:
       - path: .env
         required: false
-    volumes: ["vesper-data:/app/data"]
+    volumes:
+      - "vesper-data:/app/data"
+      # Optional: makes the host's one-time Sibyl sign-in available to the container.
+      - "${HOME}/.sibyl-memory:/root/.sibyl-memory:ro"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]

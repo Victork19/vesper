@@ -62,3 +62,4 @@ Thumbs.db
 # Test artifacts
 backend/.pytest_cache/
 backend/htmlcov/
+

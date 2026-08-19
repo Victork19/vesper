@@ -42,15 +42,20 @@ For Base proof anchoring, also set `BASE_ACCOUNT_ADDRESS`, `BASE_MCP_ACCESS_TOKE
 
 ## 3. Sibyl Memory
 
-For first-time setup, install the free local client and sign in once:
+For first-time setup on Ubuntu, install Python tooling first:
 
 ```bash
-python3 -m pip install 'sibyl-memory-cli[mcp]'
+sudo apt update
+sudo apt install -y python3-pip python3-venv
+python3 -m venv ~/.venvs/sibyl
+source ~/.venvs/sibyl/bin/activate
+python -m pip install --upgrade pip
+python -m pip install 'sibyl-memory-cli[mcp]'
 sibyl init
 sibyl status
 ```
 
-The browser sign-in may use an email code or wallet. Credentials are saved in `~/.sibyl-memory/credentials.json`. After this one-time setup, normal local reads and writes do not require a paid Sibyl API key. The container stores its local database at `/app/data/vesper.db` through the Docker volume. For offline development, use `SIBYL_OFFICIAL=0`; the local mirror preserves the same memory tiers and deletion test.
+The browser sign-in may use an email code or wallet. Credentials are saved in `~/.sibyl-memory/credentials.json`. After this one-time setup, normal local reads and writes do not require a paid Sibyl API key. The Docker Compose file mounts this directory read-only into the backend container. The container stores its local database at `/app/data/vesper.db` through the Docker volume. For offline development, use `SIBYL_OFFICIAL=0`; the local mirror preserves the same memory tiers and deletion test.
 
 ## 4. Start the backend
 
