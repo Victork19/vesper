@@ -1,8 +1,29 @@
 # Vesper
 
-Vesper is a long-horizon decision agent for the Sibyl Memory Hackathon.
+Vesper is a long-horizon decision agent whose memory is load-bearing. It stores meaningful failures as permanent scars, turns them into rules/cooldowns/trust changes, and cites those scars in later decisions.
 
-Every meaningful failure is stored as a permanent scar. Scars change the agent's future decisions. In a fresh session, Vesper recalls the scars and behaves differently. Without the memory, it repeats the same mistakes. Memory is load-bearing.
+## Judge path: verify the gate in under two minutes
+
+1. Open the live site. The chrome shows `Memory ON`, the scar count, trust, cooldowns, Base status, and the GitHub link.
+2. Click `Disable memory`. The status must become `MEMORY DISABLED`.
+3. Click `Run same decision` for the prefilled irreversible-transfer situation. This is the naive baseline and should show `No scars recalled`.
+4. Click `Create scar`, then `Enable memory`.
+5. Click `Run same decision` again without changing the situation. The decision now cites the scar and should become safer (`DO NOTHING` or `REFUSE / REQUEST MORE EVIDENCE`). The UI records both outcomes side by side.
+6. On the scar, click `Anchor on Base`. The UI only shows a Basescan link after the configured Base action returns a confirmed transaction hash.
+
+This is the continuous deletion beat to record: same situation, memory off, baseline decision, scar write, memory on, same decision, visible citation.
+
+## What to inspect
+
+| Proof | Location |
+| --- | --- |
+| Memory deletion | `backend/app/memory/sibyl.py`, `POST /demo/disable-memory` |
+| Memory-off behavior | `backend/app/agent/loop.py`, `HotState.memory_enabled` |
+| Scar write/read | `backend/app/agent/scars.py`, `backend/app/memory/sibyl.py` |
+| Decision citation | `backend/app/agent/decision.py`, `DecisionRecord.cited_scars` |
+| Tiered persistence | `SibylMemory`: HOT, WARM, COLD, REFERENCE, ARCHIVE |
+| Base anchor | `contracts/ScarAnchor.sol`, `backend/app/base_mcp/adapter.py`, `POST /scars/{id}/anchor` |
+| Frontend proof | `frontend/src/main.tsx` |
 
 ## Run locally
 
@@ -20,51 +41,33 @@ npm install
 npm run dev
 ```
 
-### First-time Sibyl setup
+The frontend defaults to `http://localhost:8000`. For deployment set `VITE_API_URL` and optionally `VITE_GITHUB_URL`.
 
-Install the free local client and sign in once:
+## Memory architecture
 
-```bash
-pip install 'sibyl-memory-cli[mcp]'
-sibyl init
-```
+- HOT: trust, memory-enabled state, active constraints, and cooldowns.
+- WARM: scars and consolidated principles.
+- COLD: immutable decision/event journal.
+- REFERENCE: constitution and hard limits.
+- ARCHIVE: retained records removed from active recall.
 
-The browser sign-in may use an email code or wallet. Credentials are saved locally in `~/.sibyl-memory/credentials.json`. After this one-time setup, Vesper uses the free five-tier local memory on disk. No paid Sibyl API key is required for the core demo.
-
-## Memory walkthrough
-
-1. Disable memory and run the transfer decision. Vesper proposes a risky action.
-2. Inject a failure. The failure is persisted as a permanent scar with a timestamp.
-3. Start a fresh session and run the same decision.
-4. Vesper recalls the scar, tightens its rules, lowers trust, and chooses a safer action or does nothing.
-
-Scars are stored as WARM records, current trust and cooldown data are stored as HOT state, and decisions/events are written to the COLD journal. The backend writes through the Sibyl client when it is available; the local SQLite adapter keeps the same structure for offline development.
-
-## Deployment
-
-The backend runs on EC2 with Docker Compose. The frontend runs on Cloudflare Pages.
-
-For Cloudflare Pages:
-
-```text
-Root directory: frontend
-Build command: npm run build
-Output directory: dist
-VITE_API_URL=https://api.example.com
-```
-
-For EC2, copy `deploy/ec2.env.example` to `backend/.env`, configure the API domain and CORS, then run:
-
-```bash
-bash deploy/deploy.sh
-```
-
-Keep credentials out of Git. See [SECURITY.md](SECURITY.md).
+The backend uses the Sibyl client when available and keeps a local SQLite mirror for a reproducible offline demo. The deletion endpoint removes learning memory and explicitly switches recall off; it does not silently claim that memory still exists.
 
 ## Base proof
 
-High-severity scars can be anchored through the user-approved Base MCP flow. The Base contract is in `contracts/ScarAnchor.sol`. Base is used for proof only; Sibyl Memory remains the primary store.
+Base is a proof anchor, not the primary memory store. `contracts/ScarAnchor.sol` emits `ScarAnchored(bytes32 scarHash, string scarId, ...)`. Configure the approved mainnet flow in the backend environment and set `BASE_DEMO_TX_HASH` only to a real confirmed Base transaction hash. Never use a placeholder hash in the submission.
+
+The UI links confirmed anchors directly to `https://basescan.org/tx/<hash>` and displays the number of anchored scars from `/identity`.
 
 ## API
 
-FastAPI documentation is available at `/docs`. Main endpoints include `/agent/decide`, `/scars`, `/scars/{id}/anchor`, `/decisions`, `/state/hot`, `/identity`, and `/health`.
+FastAPI docs: `/docs`
+
+Core endpoints: `/agent/decide`, `/scars`, `/scars/{id}/anchor`, `/decisions`, `/state/hot`, `/identity`, `/health`, `/demo/disable-memory`, `/demo/seed-failure`, `/demo/enable-memory`, and `/demo/fresh-session`.
+
+## Submission checklist
+
+- Record the deletion test continuously with the same situation and both outcomes visible.
+- Show the commit or timestamp during the recording.
+- Show a real confirmed Base mainnet transaction in the scar card and open its Basescan link.
+- Keep the video focused on memory deletion, scar creation, decision change, and proof.

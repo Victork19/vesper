@@ -35,6 +35,7 @@ class Principle(BaseModel):
     status: str = 'active'
 
 class HotState(BaseModel):
+    memory_enabled: bool = True
     trust_score: float = Field(default=0.5, ge=0, le=1)
     active_constraints: list[str] = Field(default_factory=list)
     active_cooldowns: dict[str,str] = Field(default_factory=dict)

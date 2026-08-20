@@ -45,4 +45,4 @@ class SibylMemory:
     def timeline(self): return self.all('COLD')
     def archive(self,item): self.put('ARCHIVE',item.id,item.model_dump()); self.db.execute('DELETE FROM memory WHERE tier=? AND key=?',('WARM',item.id)); self.db.commit()
     def delete_learning_memory(self):
-        self.db.execute("DELETE FROM memory WHERE tier IN ('HOT','WARM','ARCHIVE')"); self.db.commit(); self.set_hot(HotState(session_id='memory_deleted'))
+        self.db.execute("DELETE FROM memory WHERE tier IN ('HOT','WARM','ARCHIVE')"); self.db.commit(); self.set_hot(HotState(memory_enabled=False,session_id='memory_deleted'))

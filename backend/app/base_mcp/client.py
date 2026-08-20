@@ -9,8 +9,8 @@ class BaseMCPClient:
         body=json.dumps({'jsonrpc':'2.0','id':1,'method':method,'params':params}).encode()
         req=urllib.request.Request(self.url,body,{'Content-Type':'application/json','Authorization':'Bearer '+self.token})
         with urllib.request.urlopen(req,timeout=20) as res: return json.loads(res.read())
-    def prepare_anchor(self, scar):
-        result=self.call('tools/call',{'name':os.getenv('BASE_MCP_ANCHOR_TOOL','send_transaction'),'arguments':{'to':os.getenv('BASE_ANCHOR_CONTRACT',''),'data':'0x','value':'0'}})
+    def prepare_anchor(self, scar, calldata):
+        result=self.call('tools/call',{'name':os.getenv('BASE_MCP_ANCHOR_TOOL','send_transaction'),'arguments':{'to':os.getenv('BASE_ANCHOR_CONTRACT',''),'data':calldata,'value':'0'}})
         if result and result.get('result'):
             text=json.dumps(result['result'])
             return {'status':'pending_approval','approval_url':next((x for x in text.split('"') if x.startswith('http')),None),'request_id':result.get('id')}

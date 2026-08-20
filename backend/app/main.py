@@ -47,6 +47,9 @@ def anchor_scar(scar_id):
     return result
 @app.post('/demo/disable-memory')
 def disable_memory():memory.delete_learning_memory();return {'status':'memory_deleted','message':'Without the memory, Vesper will repeat the same mistake.'}
+@app.post('/demo/enable-memory')
+def enable_memory():
+    state=memory.get_hot(); state.memory_enabled=True; memory.set_hot(state); memory.journal('memory_enabled',{'reason':'deletion_test_recall'}); return {'status':'memory_enabled','message':'Memory is enabled. The next decision may recall the scar.'}
 @app.post('/demo/seed-failure',response_model=Scar)
 def seed_failure():return loop.failure('Never approve an irreversible transfer to a new destination without independent verification and a reversible test.','A rushed transfer was approved without validating the destination or exit path.',8)
 @app.post('/demo/fresh-session')
