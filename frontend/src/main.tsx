@@ -1,4 +1,5 @@
 import {useEffect, useState, type ReactNode} from 'react';
+import {createRoot} from 'react-dom/client';
 import {Activity, AlertTriangle, ArrowUpRight, BookOpen, Check, Clock3, Github, RefreshCcw, Shield, Skull, Sparkles} from 'lucide-react';
 import './styles.css';
 
