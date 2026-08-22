@@ -79,4 +79,5 @@ def reset():return fresh_session()
 @app.get('/identity')
 def identity():
     rpc=os.getenv('BASE_RPC_URL','https://mainnet.base.org'); sepolia='sepolia' in rpc; network='Base Sepolia' if sepolia else 'Base'; explorer='https://sepolia.basescan.org' if sepolia else 'https://basescan.org'
-    return {'name':'Vesper','network':network,'explorer_base':explorer,'address':os.getenv('BASE_ACCOUNT_ADDRESS'),'connected':bool(os.getenv('BASE_ACCOUNT_ADDRESS')),'anchored_scars':sum(bool(s.onchain_tx) for s in memory.scars())}
+    anchor_ready=bool(os.getenv('BASE_ANCHOR_CONTRACT') and os.getenv('BASE_MCP_ACCESS_TOKEN'))
+    return {'name':'Vesper','network':network,'explorer_base':explorer,'address':os.getenv('BASE_ACCOUNT_ADDRESS'),'connected':bool(os.getenv('BASE_ACCOUNT_ADDRESS')),'anchor_ready':anchor_ready,'anchor_mode':'mcp_approval' if anchor_ready else 'setup_required','anchored_scars':sum(bool(s.onchain_tx) for s in memory.scars())}
