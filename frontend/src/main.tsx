@@ -1,4 +1,5 @@
 import {useEffect,useState,type ReactNode} from 'react';
+import {createRoot} from 'react-dom/client';
 import {Activity,AlertTriangle,ArrowUpRight,BookOpen,Check,Clock3,Github,RefreshCcw,Shield,Skull,Sparkles} from 'lucide-react';
 import './styles.css';
 import './overrides.css';
@@ -7,7 +8,7 @@ const API=import.meta.env.VITE_API_URL||'http://localhost:8000';
 const GITHUB=import.meta.env.VITE_GITHUB_URL||'https://github.com/Victork19/vesper';
 type Scar={id:string;severity:number;lesson:string;principle:string;cooldown_until?:string|null;onchain_tx?:string|null};
 type Principle={id:string;statement:string;strength:number;source_scars:string[]};
-type Decision={id:string;action:string;rationale:string;risk_score:number;cited_scars:string[];created_at:string;memory_enabled:boolean};
+type Decision={id:string;situation:string;action:string;rationale:string;risk_score:number;cited_scars:string[];created_at:string;memory_enabled:boolean};
 type Scenario={id:string;label:string;situation:string;lesson:string;context:string;severity:number};
 async function api(path:string,init?:RequestInit){const response=await fetch(API+path,{headers:{'Content-Type':'application/json'},...init});if(!response.ok)throw Error(await response.text());return response.json()}
 
