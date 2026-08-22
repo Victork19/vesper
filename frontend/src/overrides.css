@@ -5,4 +5,5 @@
 .scenario-options button:hover,.scenario-options button.selected{border-color:var(--mint);color:var(--mint);background:#193329}
 .outcome-actions{display:flex;gap:6px;margin-top:10px}
 .outcome-actions button{font-size:9px;padding:6px 8px;color:#9ee8c9}
+.demo-guide{display:flex;gap:10px;align-items:baseline;padding:11px 13px;margin-bottom:10px;border:1px solid #355247;border-radius:7px;background:#10221c;color:#b8c9bf;font-size:11px;line-height:1.45}.demo-guide strong{color:#9ee8c9;white-space:nowrap}.demo-guide span{color:#87988e}
 @media(max-width:700px){.scenario-bar{align-items:flex-start;flex-direction:column}.scenario-options{justify-content:flex-start}}
