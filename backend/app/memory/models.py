@@ -25,6 +25,9 @@ class Scar(BaseModel):
     linked_principles: list[str] = Field(default_factory=list)
     onchain_tx: str | None = None
     onchain_hash: str | None = None
+    anchor_status: str | None = None
+    anchor_request_id: str | None = None
+    anchor_approval_url: str | None = None
 
 class Principle(BaseModel):
     id: str
@@ -53,9 +56,19 @@ class Constitution(BaseModel):
     ])
 
 class DecisionRequest(BaseModel):
-    situation: str
+    situation: str = Field(min_length=8,max_length=2000)
     choices: list[str] = Field(default_factory=list)
     execute: bool = False
+
+class OutcomeRequest(BaseModel):
+    decision_id: str
+    outcome: Literal['success','failure','loss','negative','cancelled'] = 'failure'
+    lesson: str = Field(default='The decision produced a negative outcome.',min_length=8,max_length=2000)
+    context: str = Field(default='',max_length=4000)
+    severity: int = Field(default=7,ge=1,le=10)
+
+class ScenarioRequest(BaseModel):
+    scenario: Literal['irreversible_transfer','production_deploy','treasury_payment'] = 'irreversible_transfer'
 
 class DecisionRecord(BaseModel):
     id: str

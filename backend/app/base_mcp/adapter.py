@@ -1,20 +1,49 @@
-import hashlib, json, os
+import hashlib, json, os, re, urllib.request
 from ..memory.models import AnchorResult
 from .client import BaseMCPClient
 
+TX_RE=re.compile(r'^0x[a-fA-F0-9]{64}$')
+
 class BaseMCPAdapter:
-    def anchor(self, scar):
-        canonical = json.dumps(scar.model_dump(exclude={'onchain_tx','onchain_hash'}), sort_keys=True, separators=(',',':')).encode()
+    @staticmethod
+    def _explorer(tx):
+        host='sepolia.basescan.org' if 'sepolia' in os.getenv('BASE_RPC_URL','') else 'basescan.org'
+        return f'https://{host}/tx/{tx}'
+    def _canonical_hash(self,scar):
+        canonical=json.dumps(scar.model_dump(exclude={'onchain_tx','onchain_hash'}),sort_keys=True,separators=(',',':')).encode()
         try:
             from eth_hash.auto import keccak
-            digest = '0x' + keccak(canonical).hex()
+            return '0x'+keccak(canonical).hex()
         except ImportError:
-            digest = '0x' + hashlib.sha3_256(canonical).hexdigest()
-        tx = os.getenv('BASE_DEMO_TX_HASH')
-        if not tx and os.getenv('BASE_MCP_ACCESS_TOKEN'):
+            return '0x'+hashlib.sha3_256(canonical).hexdigest()
+    def _receipt(self,tx,scar_hash):
+        if not TX_RE.match(tx):return None
+        body=json.dumps({'jsonrpc':'2.0','id':1,'method':'eth_getTransactionReceipt','params':[tx]}).encode()
+        req=urllib.request.Request(os.getenv('BASE_RPC_URL','https://mainnet.base.org'),body,{'Content-Type':'application/json'})
+        with urllib.request.urlopen(req,timeout=10) as res:
+            result=json.loads(res.read()).get('result')
+        if not result or result.get('status')!='0x1' or not result.get('blockNumber'):return None
+        contract=os.getenv('BASE_ANCHOR_CONTRACT','').lower()
+        try:
+            from eth_hash.auto import keccak
+            event_topic='0x'+keccak(b'ScarAnchored(bytes32,string,uint256,address)').hex()
+        except ImportError:return None
+        matching=[log for log in result.get('logs',[]) if (not contract or (log.get('address') or '').lower()==contract) and log.get('topics',[None])[0]==event_topic and len(log.get('topics',[]))>1 and log['topics'][1].lower()==scar_hash.lower()]
+        if not matching:return None
+        return result
+    def anchor(self,scar):
+        digest=self._canonical_hash(scar); tx=os.getenv('BASE_DEMO_TX_HASH')
+        if tx:
+            try:
+                receipt=self._receipt(tx,digest)
+                if receipt:
+                    return AnchorResult(scar_id=scar.id,canonical_hash=digest,transaction_hash=tx,explorer_url=self._explorer(tx),status='confirmed')
+            except Exception: pass
+            return AnchorResult(scar_id=scar.id,canonical_hash=digest,status='awaiting_chain_verification')
+        if os.getenv('BASE_MCP_ACCESS_TOKEN'):
             from eth_hash.auto import keccak
             from eth_abi import encode
             calldata='0x'+(keccak(b'anchor(bytes32,string)')[:4]+encode(['bytes32','string'],[bytes.fromhex(digest[2:]),scar.id])).hex()
             pending=BaseMCPClient().prepare_anchor(scar,calldata)
-            return AnchorResult(scar_id=scar.id, canonical_hash=digest, approval_url=pending.get('approval_url'), request_id=pending.get('request_id'), status=pending['status'])
-        return AnchorResult(scar_id=scar.id, canonical_hash=digest, transaction_hash=tx, explorer_url=f'https://basescan.org/tx/{tx}' if tx else None, status='confirmed' if tx else 'awaiting_wallet_approval')
+            return AnchorResult(scar_id=scar.id,canonical_hash=digest,approval_url=pending.get('approval_url'),request_id=pending.get('request_id'),status=pending['status'])
+        return AnchorResult(scar_id=scar.id,canonical_hash=digest,status='awaiting_wallet_approval')

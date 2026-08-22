@@ -1,0 +1,8 @@
+.scenario-bar{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 18px;margin-top:12px;background:#121815}
+.scenario-bar small{display:block;color:#89958c;font-size:10px;margin-top:4px}
+.scenario-options{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.scenario-options button,.outcome-actions button{background:#1a211e;border:1px solid #35443b;color:#b9c5bc;border-radius:6px;padding:8px 10px;cursor:pointer;font:600 10px Manrope}
+.scenario-options button:hover,.scenario-options button.selected{border-color:var(--mint);color:var(--mint);background:#193329}
+.outcome-actions{display:flex;gap:6px;margin-top:10px}
+.outcome-actions button{font-size:9px;padding:6px 8px;color:#9ee8c9}
+@media(max-width:700px){.scenario-bar{align-items:flex-start;flex-direction:column}.scenario-options{justify-content:flex-start}}

@@ -30,8 +30,6 @@ htmlcov/
 data/
 backend/data/
 *.db
-*.sqlite
-*.sqlite3
 *.db-shm
 *.db-wal
 *.log
@@ -62,4 +60,3 @@ Thumbs.db
 # Test artifacts
 backend/.pytest_cache/
 backend/htmlcov/
-

@@ -1,34 +1,61 @@
-import json, os, sqlite3
-from pathlib import Path
+"""Authoritative Sibyl Memory repository for Vesper."""
+import json, os
 from .models import *
+from sibyl_memory_client.exceptions import NotFoundError
 
 class SibylMemory:
-    """Sibyl-first repository. Local mirror is explicit and keeps the deletion test reproducible."""
-    def __init__(self, path=None):
-        self.path=Path(path or os.getenv('SIBYL_DB_PATH','./data/vesper.db')).expanduser(); self.path.parent.mkdir(parents=True,exist_ok=True)
-        self.db=sqlite3.connect(self.path,check_same_thread=False); self.db.row_factory=sqlite3.Row
-        self.db.execute('CREATE TABLE IF NOT EXISTS memory (tier TEXT,key TEXT,value TEXT,updated_at TEXT,PRIMARY KEY(tier,key))'); self.db.commit()
-        self.official=None
-        if os.getenv('SIBYL_OFFICIAL','1')!='0':
-            try:
-                from sibyl_memory_client import MemoryClient
-                self.official=MemoryClient.local(str(self.path))
-            except Exception: pass
-        if not self.get_hot().session_id: self.set_hot(HotState(session_id='session_initial'))
-        if not self.get_reference(): self.put('REFERENCE','constitution',Constitution().model_dump())
+    def __init__(self):
+        from sibyl_memory_client import MemoryClient
+        self.path=os.getenv('SIBYL_MEMORY_PATH','/app/data/sibyl-memory.db')
+        self.tenant=os.getenv('SIBYL_TENANT_ID','vesper')
+        self.official=MemoryClient.local(self.path,tenant_id=self.tenant)
+        self.official_error=None
+        if not self._get_state('state'):
+            self._set_state('state',HotState(session_id='session_initial').model_dump())
+        if not self._get_reference('constitution'):
+            self._set_reference('constitution',Constitution().model_dump())
+
+    @staticmethod
+    def _body(row): return row.get('body') if isinstance(row,dict) and 'body' in row else row
+    def _set_entity(self,key,value,category='vesper'): return self.official.set_entity(category,key,value)
+    def _get_entity(self,key,category='vesper'):
+        try:return self._body(self.official.get_entity(category,key))
+        except NotFoundError:return None
+    def _set_state(self,key,value): self.official.set_state(key,value)
+    def _get_state(self,key):
+        row=self.official.get_state(key); return self._body(row) if row else None
+    def _set_reference(self,key,value): self.official.set_reference(key,value)
+    def _get_reference(self,key):
+        row=self.official.get_reference(key)
+        if not row:return None
+        body=self._body(row)
+        if isinstance(body,str):
+            try:return json.loads(body)
+            except json.JSONDecodeError:return body
+        return body
+    def _entities(self,category='vesper'):
+        return [self._body(x) for x in self.official.list_entities(category=category,limit=10000)]
     def put(self,tier,key,value):
-        self.db.execute('INSERT OR REPLACE INTO memory VALUES (?,?,?,?)',(tier,key,json.dumps(value),now_iso())); self.db.commit(); self._official_write(tier,key,value)
-    def _official_write(self,tier,key,value):
-        if not self.official:return
-        try:
-            if tier=='WARM' and hasattr(self.official,'set_entity'): self.official.set_entity('vesper',key,value)
-            elif tier=='HOT' and hasattr(self.official,'set_state'): self.official.set_state('vesper',key,value)
-            elif tier=='REFERENCE' and hasattr(self.official,'set_reference'): self.official.set_reference('vesper',key,value)
-            elif tier=='COLD' and hasattr(self.official,'write_event'): self.official.write_event('vesper',key,value)
-        except Exception: pass
+        if tier=='WARM': self._set_entity(key,value)
+        elif tier=='HOT': self._set_state(key,value)
+        elif tier=='REFERENCE': self._set_reference(key,value)
+        elif tier=='ARCHIVE': self._set_entity(key,value,'vesper_archive')
+        elif tier=='COLD': self.official.write_event(extra={'key':key,'value':value})
     def get(self,tier,key):
-        row=self.db.execute('SELECT value FROM memory WHERE tier=? AND key=?',(tier,key)).fetchone(); return json.loads(row['value']) if row else None
-    def all(self,tier): return [json.loads(r['value']) for r in self.db.execute('SELECT value FROM memory WHERE tier=? ORDER BY updated_at DESC',(tier,))]
+        if tier=='WARM':return self._get_entity(key)
+        if tier=='HOT':return self._get_state(key)
+        if tier=='REFERENCE':return self._get_reference(key)
+        if tier=='ARCHIVE':return self._get_entity(key,'vesper_archive')
+        if tier=='COLD':
+            for event in self.official.read_events(limit=10000):
+                extra=event.get('extra') or {}
+                if extra.get('key')==key:return extra.get('value')
+        return None
+    def all(self,tier):
+        if tier=='WARM':return self._entities()
+        if tier=='ARCHIVE':return self._entities('vesper_archive')
+        if tier=='COLD':return [x.get('extra',{}).get('value') for x in self.official.read_events(limit=10000) if (x.get('extra') or {}).get('value') is not None]
+        return []
     def get_hot(self): return HotState.model_validate(self.get('HOT','state') or {})
     def set_hot(self,state): self.put('HOT','state',state.model_dump())
     def get_reference(self): return self.get('REFERENCE','constitution')
@@ -40,9 +67,17 @@ class SibylMemory:
     def save_principle(self,p): self.put('WARM',p.id,p.model_dump())
     def principles(self): return [Principle.model_validate(x) for x in self.all('WARM') if isinstance(x,dict) and 'statement' in x]
     def save_decision(self,d): self.put('COLD',d.id,d.model_dump())
-    def decisions(self): return [DecisionRecord.model_validate(x) for x in self.all('COLD') if isinstance(x,dict) and 'action' in x]
+    def decisions(self):
+        latest={}
+        for item in self.all('COLD'):
+            if isinstance(item,dict) and 'action' in item: latest[item['id']]=item
+        return [DecisionRecord.model_validate(item) for item in latest.values()]
     def journal(self,event,payload): self.put('COLD','event_'+now_iso()+'_'+str(len(self.all('COLD'))),{'event':event,'payload':payload,'created_at':now_iso()})
     def timeline(self): return self.all('COLD')
-    def archive(self,item): self.put('ARCHIVE',item.id,item.model_dump()); self.db.execute('DELETE FROM memory WHERE tier=? AND key=?',('WARM',item.id)); self.db.commit()
+    def archive(self,item): self.put('ARCHIVE',item.id,item.model_dump())
     def delete_learning_memory(self):
-        self.db.execute("DELETE FROM memory WHERE tier IN ('HOT','WARM','ARCHIVE')"); self.db.commit(); self.set_hot(HotState(memory_enabled=False,session_id='memory_deleted'))
+        for item in self._entities():
+            if isinstance(item,dict) and ('lesson' in item or 'statement' in item): self.official.delete_entity('vesper',item.get('id',''))
+        for item in self._entities('vesper_archive'):
+            if isinstance(item,dict): self.official.delete_entity('vesper_archive',item.get('id',''))
+        self._set_state('state',HotState(memory_enabled=False,session_id='memory_deleted').model_dump())
