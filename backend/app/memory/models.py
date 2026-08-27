@@ -98,3 +98,6 @@ class AnchorResult(BaseModel):
     approval_url: str | None = None
     request_id: str | None = None
     status: str
+
+class AnchorVerifyRequest(BaseModel):
+    transaction_hash: str = Field(pattern=r'^0x[a-fA-F0-9]{64}$')

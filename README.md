@@ -60,13 +60,19 @@ The backend uses the official Sibyl client as its only memory layer. The deletio
 
 Base MCP is the execution layer. Vesper prepares `ScarAnchor` calldata at `GET /scars/{id}/prepare`. Base MCP submits it through `send_calls`, the user approves in Base Account, and Vesper verifies the receipt and `ScarAnchored` event. Vesper never holds a key. Base is a proof anchor, not the primary memory store. `contracts/ScarAnchor.sol` emits `ScarAnchored(bytes32 scarHash, string scarId, ...)`. Keep `BASE_DEMO_TX_HASH` only as a verifier after a real MCP transaction; never use a placeholder hash in the submission.
 
-The UI links confirmed anchors to the correct Base or Base Sepolia explorer and displays the number of anchored scars from `/identity`.
+The UI loads the official Base Account SDK, connects the operator's Base Account,
+calls `wallet_sendCalls` with the calldata returned by `/prepare`, polls
+`wallet_getCallsStatus`, and submits the confirmed transaction to
+`POST /scars/{id}/verify`. Vesper only marks an anchor confirmed after checking
+the receipt and matching `ScarAnchored(scarHash, scarId)`. The UI links confirmed
+anchors to the correct Base explorer and displays the number of anchored scars
+from `/identity`.
 
 ## API
 
 FastAPI docs: `/docs`
 
-Core endpoints: `/agent/decide`, `/agent/outcome`, `/scenarios`, `/scars`, `/scars/{id}/prepare`, `/scars/{id}/anchor`, `/decisions`, `/state/hot`, `/identity`, `/health`, `/demo/disable-memory`, `/demo/seed-failure`, `/demo/enable-memory`, and `/demo/fresh-session`.
+Core endpoints: `/agent/decide`, `/agent/outcome`, `/scenarios`, `/scars`, `/scars/{id}/prepare`, `/scars/{id}/anchor`, `/scars/{id}/verify`, `/decisions`, `/state/hot`, `/identity`, `/health`, `/demo/disable-memory`, `/demo/seed-failure`, `/demo/enable-memory`, and `/demo/fresh-session`.
 
 ## Submission checklist
 

@@ -49,6 +49,11 @@ def test_prepare_returns_base_send_calls_payload():
     assert body['data']['value']=='0x0' and body['data']['chainId']==8453
     assert body['data']['data'].startswith('0x') and len(body['data']['data'])>10
 
+def test_verify_rejects_unknown_transaction():
+    scar=client.post('/scars',json={'lesson':'Verify the destination before an irreversible transfer.','severity':8,'decision_class':'irreversible_transfer'}).json()
+    response=client.post(f"/scars/{scar['id']}/verify",json={'transaction_hash':'0x'+'0'*64})
+    assert response.status_code==400
+
 def test_scenarios_and_outcome_lifecycle():
     scenarios=client.get('/scenarios').json()
     assert {item['id'] for item in scenarios} >= {'irreversible_transfer','production_deploy','treasury_payment'}

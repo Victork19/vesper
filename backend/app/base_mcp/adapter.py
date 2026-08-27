@@ -47,3 +47,9 @@ class BaseMCPAdapter:
             except Exception: pass
             return AnchorResult(scar_id=scar.id,canonical_hash=digest,status='awaiting_chain_verification')
         return AnchorResult(scar_id=scar.id,canonical_hash=digest,status='awaiting_mcp_transaction')
+    def verify(self,scar,transaction_hash):
+        digest=self._canonical_hash(scar)
+        receipt=self._receipt(transaction_hash,digest)
+        if not receipt:
+            return AnchorResult(scar_id=scar.id,canonical_hash=digest,status='verification_failed')
+        return AnchorResult(scar_id=scar.id,canonical_hash=digest,transaction_hash=transaction_hash,explorer_url=self._explorer(transaction_hash),status='confirmed')

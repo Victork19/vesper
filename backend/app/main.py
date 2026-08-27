@@ -63,6 +63,19 @@ def anchor_scar(scar_id):
     if result.transaction_hash:scar.onchain_tx=result.transaction_hash;scar.onchain_hash=result.canonical_hash
     memory.save_scar(scar)
     return result
+@app.post('/scars/{scar_id}/verify',response_model=AnchorResult)
+def verify_scar_anchor(scar_id,req:AnchorVerifyRequest):
+    scar=memory.get_scar(scar_id)
+    if not scar:raise HTTPException(404,'Scar not found')
+    try:
+        result=anchor.verify(scar,req.transaction_hash)
+    except Exception:
+        result=AnchorResult(scar_id=scar.id,canonical_hash=anchor._canonical_hash(scar),status='verification_failed')
+    if result.status!='confirmed':
+        raise HTTPException(400,'Transaction receipt or ScarAnchored event could not be verified')
+    scar.anchor_status=result.status; scar.onchain_tx=result.transaction_hash; scar.onchain_hash=result.canonical_hash
+    memory.save_scar(scar)
+    return result
 @app.get('/scars/{scar_id}/prepare')
 def prepare_scar(scar_id,from_:str=Query(...,alias='from')):
     scar=memory.get_scar(scar_id)

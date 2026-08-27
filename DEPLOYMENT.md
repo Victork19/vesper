@@ -106,7 +106,13 @@ and verify the contract/source on Basescan before the demo. Do not use a
 placeholder hash. `BASE_DEMO_TX_HASH` is optional and only verifies a real
 MCP-submitted transaction; it is not the execution path.
 
-The MCP flow is: `GET /scars/{id}/prepare?from=0x...` → Base MCP `send_calls` with the returned `{to,value,data}` → user approval in Base Account → receipt verification by Vesper. If using the MCP approval path instead of `BASE_DEMO_TX_HASH`, configure:
+The Base Account flow is: `GET /scars/{id}/prepare?from=0x...` → the frontend's
+Base Account provider calls `wallet_sendCalls` with the returned `{to,value,data}`
+on chain `0x2105` → user approval in Base Account → frontend polls
+`wallet_getCallsStatus` → `POST /scars/{id}/verify` with the resulting transaction
+hash → Vesper verifies the receipt and `ScarAnchored` event. The same prepared
+call can be submitted by a connected Base MCP host with `send_calls`; the host
+owns its own authentication and approval UI.
 
 ```env
 BASE_MCP_URL=https://mcp.base.org
@@ -116,7 +122,8 @@ BASE_ANCHOR_CONTRACT=0xYOUR_CONTRACT
 ```
 
 The MCP host owns the Base MCP connection and the Base Account approval. No
-Base MCP token is configured in Vesper for this flow.
+No Base MCP token is configured in Vesper for this flow. The browser flow uses the
+official Base Account SDK loaded in `frontend/index.html`.
 
 ### Credentials and account roles
 
