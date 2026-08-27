@@ -77,6 +77,41 @@ different memory implementation.
 Persist the Docker volume containing `/app/data`. Without it, the agent loses
 its local Sibyl database and cannot recall prior scars after a restart.
 
+### Enable HTTPS before opening the production frontend
+
+The checked-in `deploy/nginx.conf` is the temporary HTTP configuration used to
+complete the Let's Encrypt challenge. It is not the final production
+configuration. On the EC2 security group, allow inbound TCP 80 and 443 and do
+not expose port 8000 publicly. From the repository root on EC2, start the
+backend and HTTP Nginx:
+
+```bash
+docker compose -f backend/docker-compose.yml up -d --build backend nginx
+```
+
+Issue the certificate through the running HTTP challenge endpoint:
+
+```bash
+docker compose -f backend/docker-compose.yml run --rm certbot certonly \
+  --webroot -w /var/www/certbot \
+  -d vesper-scar.duckdns.org \
+  --email YOUR_LETSENCRYPT_EMAIL \
+  --agree-tos --no-eff-email
+```
+
+After Certbot succeeds, activate the TLS configuration and recreate Nginx:
+
+```bash
+cp deploy/nginx-https.conf deploy/nginx.conf
+docker compose -f backend/docker-compose.yml up -d --force-recreate nginx
+docker compose -f backend/docker-compose.yml exec nginx nginx -t
+curl --fail https://vesper-scar.duckdns.org/health
+```
+
+Do not point Cloudflare Pages or the Base Account SDK at the backend until the
+last HTTPS check succeeds. Renew the certificate before expiry, then recreate
+Nginx so it reloads the renewed files.
+
 ## Base network configuration
 
 The anchor verifier checks `eth_getTransactionReceipt` and only displays a
@@ -106,8 +141,9 @@ and verify the contract/source on Basescan before the demo. Do not use a
 placeholder hash. `BASE_DEMO_TX_HASH` is optional and only verifies a real
 MCP-submitted transaction; it is not the execution path.
 
-The Base Account flow is: `GET /scars/{id}/prepare?from=0x...` → the frontend's
-Base Account provider calls `wallet_sendCalls` with the returned `{to,value,data}`
+The Base Account flow is: the frontend calls `wallet_connect` for Base mainnet →
+`GET /scars/{id}/prepare?from=0x...` → the frontend's Base Account provider calls
+`wallet_sendCalls` with the returned `{to,value,data}`
 on chain `0x2105` → user approval in Base Account → frontend polls
 `wallet_getCallsStatus` → `POST /scars/{id}/verify` with the resulting transaction
 hash → Vesper verifies the receipt and `ScarAnchored` event. The same prepared

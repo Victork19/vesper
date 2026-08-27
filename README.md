@@ -60,8 +60,9 @@ The backend uses the official Sibyl client as its only memory layer. The deletio
 
 Base MCP is the execution layer. Vesper prepares `ScarAnchor` calldata at `GET /scars/{id}/prepare`. Base MCP submits it through `send_calls`, the user approves in Base Account, and Vesper verifies the receipt and `ScarAnchored` event. Vesper never holds a key. Base is a proof anchor, not the primary memory store. `contracts/ScarAnchor.sol` emits `ScarAnchored(bytes32 scarHash, string scarId, ...)`. Keep `BASE_DEMO_TX_HASH` only as a verifier after a real MCP transaction; never use a placeholder hash in the submission.
 
-The UI loads the official Base Account SDK, connects the operator's Base Account,
-calls `wallet_sendCalls` with the calldata returned by `/prepare`, polls
+The UI loads the official Base Account SDK, connects the operator's Base Account
+with `wallet_connect` (including Sign in with Ethereum on Base mainnet), and calls
+`wallet_sendCalls` with the calldata returned by `/prepare`, then polls
 `wallet_getCallsStatus`, and submits the confirmed transaction to
 `POST /scars/{id}/verify`. Vesper only marks an anchor confirmed after checking
 the receipt and matching `ScarAnchored(scarHash, scarId)`. The UI links confirmed
