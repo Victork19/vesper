@@ -316,9 +316,15 @@ Run checks:
 
 ```bash
 cd backend
+python -m pip install -r requirements-dev.txt
 python -m pytest -q
 python -m compileall -q app
 ```
+
+The test suite must pass before recording. If the host does not have Docker or
+the development Python dependencies installed, run these checks inside the
+backend image or install `requirements-dev.txt` in a dedicated virtual
+environment; a missing test runner is not a passing result.
 
 ## Fresh-session proof
 
