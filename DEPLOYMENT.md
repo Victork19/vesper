@@ -121,8 +121,8 @@ BASE_ACCOUNT_ADDRESS=0xYOUR_OPERATOR_ADDRESS
 BASE_ANCHOR_CONTRACT=0xYOUR_CONTRACT
 ```
 
-The MCP host owns the Base MCP connection and the Base Account approval. No
-No Base MCP token is configured in Vesper for this flow. The browser flow uses the
+The MCP host owns the Base MCP connection and the Base Account approval. No Base
+MCP token is configured in Vesper for this flow. The browser flow uses the
 official Base Account SDK loaded in `frontend/index.html`.
 
 ### Credentials and account roles

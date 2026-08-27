@@ -68,7 +68,7 @@ def verify_scar_anchor(scar_id,req:AnchorVerifyRequest):
     scar=memory.get_scar(scar_id)
     if not scar:raise HTTPException(404,'Scar not found')
     try:
-        result=anchor.verify(scar,req.transaction_hash)
+        result=anchor.verify(scar,req.transaction_hash,req.operator_address)
     except Exception:
         result=AnchorResult(scar_id=scar.id,canonical_hash=anchor._canonical_hash(scar),status='verification_failed')
     if result.status!='confirmed':
@@ -77,7 +77,7 @@ def verify_scar_anchor(scar_id,req:AnchorVerifyRequest):
     memory.save_scar(scar)
     return result
 @app.get('/scars/{scar_id}/prepare')
-def prepare_scar(scar_id,from_:str=Query(...,alias='from')):
+def prepare_scar(scar_id,from_:str=Query(...,alias='from',pattern=r'^0x[a-fA-F0-9]{40}$')):
     scar=memory.get_scar(scar_id)
     if not scar:raise HTTPException(404,'Scar not found')
     return {'ok':True,'data':anchor.prepare(scar)}
@@ -97,5 +97,5 @@ def reset():return fresh_session()
 @app.get('/identity')
 def identity():
     rpc=os.getenv('BASE_RPC_URL','https://mainnet.base.org'); sepolia='sepolia' in rpc; network='Base Sepolia' if sepolia else 'Base'; explorer='https://sepolia.basescan.org' if sepolia else 'https://basescan.org'
-    anchor_ready=bool(os.getenv('BASE_ANCHOR_CONTRACT'))
-    return {'name':'Vesper','network':network,'explorer_base':explorer,'address':os.getenv('BASE_ACCOUNT_ADDRESS'),'connected':bool(os.getenv('BASE_ACCOUNT_ADDRESS')),'anchor_ready':anchor_ready,'anchor_mode':'prepare_for_mcp' if anchor_ready else 'setup_required','anchored_scars':sum(bool(s.onchain_tx) for s in memory.scars())}
+    anchor_ready=anchor.is_ready() if not sepolia else False
+    return {'name':'Vesper','network':network,'explorer_base':explorer,'address':os.getenv('BASE_ACCOUNT_ADDRESS'),'connected':False,'account_configured':bool(os.getenv('BASE_ACCOUNT_ADDRESS')),'anchor_ready':anchor_ready,'anchor_mode':'prepare_for_mcp' if anchor_ready else 'setup_required','anchored_scars':sum(bool(s.onchain_tx) for s in memory.scars())}

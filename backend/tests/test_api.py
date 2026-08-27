@@ -39,6 +39,13 @@ def test_severity_nine_forces_do_nothing():
     assert decision['action']=='DO NOTHING'
     assert scar['id'] in decision['cited_scars']
 
+def test_unrelated_scars_are_not_recalled():
+    client.post('/demo/disable-memory')
+    scar=client.post('/scars',json={'lesson':'A production release failed without rollback.','context':'production deploy','severity':9,'decision_class':'production_deploy'}).json()
+    client.post('/demo/enable-memory')
+    decision=client.post('/agent/decide',json={'situation':'Review a customer support email.'}).json()
+    assert scar['id'] not in decision['cited_scars']
+
 def test_prepare_returns_base_send_calls_payload():
     scar=client.post('/scars',json={'lesson':'Verify the destination before an irreversible transfer.','severity':8,'decision_class':'irreversible_transfer'}).json()
     response=client.get(f"/scars/{scar['id']}/prepare?from=0x0000000000000000000000000000000000000001")
@@ -51,7 +58,7 @@ def test_prepare_returns_base_send_calls_payload():
 
 def test_verify_rejects_unknown_transaction():
     scar=client.post('/scars',json={'lesson':'Verify the destination before an irreversible transfer.','severity':8,'decision_class':'irreversible_transfer'}).json()
-    response=client.post(f"/scars/{scar['id']}/verify",json={'transaction_hash':'0x'+'0'*64})
+    response=client.post(f"/scars/{scar['id']}/verify",json={'transaction_hash':'0x'+'0'*64,'operator_address':'0x'+'1'*40})
     assert response.status_code==400
 
 def test_scenarios_and_outcome_lifecycle():

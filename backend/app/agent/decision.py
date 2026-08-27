@@ -20,7 +20,7 @@ def decide(situation,choices,scars,principles,hot,guardian,llm=None,execute=Fals
     relevant=[]
     for scar in class_matches+word_matches:
         if scar.id not in {item.id for item in relevant}: relevant.append(scar)
-    relevant=(relevant[:3] or scars[:3])
+    relevant=relevant[:3]
     relevant_principles=[p for p in principles if any(x in p.source_scars for x in [s.id for s in relevant])]
     risk=min(10,max(3,(max((s.severity for s in relevant),default=0)+1)))
     trust=max(0,min(1,hot.trust_score-sum(max(0,-s.impact.trust_delta) for s in relevant)))
@@ -31,9 +31,6 @@ def decide(situation,choices,scars,principles,hot,guardian,llm=None,execute=Fals
         try: llm_result=llm.complete(situation,[s.model_dump() for s in relevant])
         except Exception: llm_result=None
     if isinstance(llm_result,dict):
-        proposed=llm_result.get('action'); allowed=set(choices)|SAFE_ACTIONS
-        if isinstance(proposed,str) and proposed in allowed and not forced: action=proposed
-        if isinstance(llm_result.get('risk_score'),(int,float)) and not forced:risk=max(0,min(10,int(llm_result['risk_score'])))
         cited=[x for x in llm_result.get('cited_scars',[]) if x in {s.id for s in relevant}]
         if cited: relevant=[s for s in relevant if s.id in cited]
     blocked,msg=guardian.guard(action,risk,forced)

@@ -101,3 +101,4 @@ class AnchorResult(BaseModel):
 
 class AnchorVerifyRequest(BaseModel):
     transaction_hash: str = Field(pattern=r'^0x[a-fA-F0-9]{64}$')
+    operator_address: str = Field(pattern=r'^0x[a-fA-F0-9]{40}$')
