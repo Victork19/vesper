@@ -18,6 +18,7 @@ class Scar(BaseModel):
     lesson: str
     principle: str
     context: str = ''
+    decision_class: str = 'general'
     created_at: str = Field(default_factory=now_iso)
     cooldown_until: str | None = None
     impact: Impact = Field(default_factory=Impact)
@@ -58,6 +59,8 @@ class Constitution(BaseModel):
 class DecisionRequest(BaseModel):
     situation: str = Field(min_length=8,max_length=2000)
     choices: list[str] = Field(default_factory=list)
+    decision_class: str | None = None
+    situation_id: str | None = None
     execute: bool = False
 
 class OutcomeRequest(BaseModel):
@@ -74,6 +77,8 @@ class DecisionRecord(BaseModel):
     id: str
     created_at: str = Field(default_factory=now_iso)
     situation: str
+    decision_class: str = 'general'
+    situation_id: str | None = None
     choices: list[str] = Field(default_factory=list)
     action: str
     confidence: float = Field(ge=0, le=1)

@@ -4,9 +4,23 @@ from ..memory.models import DecisionRecord
 
 SAFE_ACTIONS={'DO NOTHING','REFUSE / REQUEST MORE EVIDENCE','PROCEED WITH SMALL REVERSIBLE TEST'}
 
-def decide(situation,choices,scars,principles,hot,guardian,llm=None,execute=False):
+def classify_situation(situation):
+    text=situation.lower()
+    if any(word in text for word in ('deploy','production','rollback','release')): return 'production_deploy'
+    if any(word in text for word in ('treasury','payment','payee')): return 'treasury_payment'
+    if any(word in text for word in ('transfer','wallet','destination','address')): return 'irreversible_transfer'
+    return 'general'
+
+def decide(situation,choices,scars,principles,hot,guardian,llm=None,execute=False,decision_class=None,situation_id=None):
+    decision_class=decision_class or classify_situation(situation)
+    situation_id=situation_id or decision_class
     sleeping=in_cooldown(scars); words=set(situation.lower().split())
-    relevant=[s for s in scars if any(w in (s.lesson+' '+s.context+' '+s.principle).lower() for w in words if len(w)>4)] or scars[:3]
+    class_matches=[s for s in scars if s.decision_class == decision_class and decision_class != 'general']
+    word_matches=[s for s in scars if any(w in (s.lesson+' '+s.context+' '+s.principle).lower() for w in words if len(w)>4)]
+    relevant=[]
+    for scar in class_matches+word_matches:
+        if scar.id not in {item.id for item in relevant}: relevant.append(scar)
+    relevant=(relevant[:3] or scars[:3])
     relevant_principles=[p for p in principles if any(x in p.source_scars for x in [s.id for s in relevant])]
     risk=min(10,max(3,(max((s.severity for s in relevant),default=0)+1)))
     trust=max(0,min(1,hot.trust_score-sum(max(0,-s.impact.trust_delta) for s in relevant)))
@@ -29,4 +43,4 @@ def decide(situation,choices,scars,principles,hot,guardian,llm=None,execute=Fals
     if relevant_principles:rationale+=' Rules tightened: '+ '; '.join(p.statement for p in relevant_principles)
     if execute:
         rationale+=' Execution was not performed: Vesper only proposes or blocks actions until an approved executor is connected.'
-    return DecisionRecord(id='decision_'+uuid.uuid4().hex[:10],situation=situation,choices=choices,action=action,confidence=max(.1,min(.95,trust-(risk*.03))),risk_score=risk,rationale=rationale,cited_scars=[s.id for s in relevant],cited_principles=[p.id for p in relevant_principles],outcome='proposed',memory_enabled=True)
+    return DecisionRecord(id='decision_'+uuid.uuid4().hex[:10],situation=situation,situation_id=situation_id,decision_class=decision_class,choices=choices,action=action,confidence=max(.1,min(.95,trust-(risk*.03))),risk_score=risk,rationale=rationale,cited_scars=[s.id for s in relevant],cited_principles=[p.id for p in relevant_principles],outcome='proposed',memory_enabled=True)

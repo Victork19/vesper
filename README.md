@@ -25,7 +25,7 @@ This is the continuous deletion beat to record: same situation, memory off, base
 | Scar write/read | `backend/app/agent/scars.py`, `backend/app/memory/sibyl.py` |
 | Decision citation | `backend/app/agent/decision.py`, `DecisionRecord.cited_scars` |
 | Tiered persistence | `SibylMemory`: HOT, WARM, COLD, REFERENCE, ARCHIVE |
-| Base anchor | `contracts/ScarAnchor.sol`, `backend/app/base_mcp/adapter.py`, `POST /scars/{id}/anchor` |
+| Base anchor | `contracts/ScarAnchor.sol`, `backend/app/base_mcp/adapter.py`, `GET /scars/{id}/prepare`, `POST /scars/{id}/anchor` |
 | Frontend proof | `frontend/src/main.tsx` |
 
 ## Run locally
@@ -58,7 +58,7 @@ The backend uses the official Sibyl client as its only memory layer. The deletio
 
 ## Base proof
 
-Base is a proof anchor, not the primary memory store. `contracts/ScarAnchor.sol` emits `ScarAnchored(bytes32 scarHash, string scarId, ...)`. Configure the approved mainnet flow in the backend environment and set `BASE_DEMO_TX_HASH` only to a real confirmed Base transaction hash. Never use a placeholder hash in the submission.
+Base MCP is the execution layer. Vesper prepares `ScarAnchor` calldata at `GET /scars/{id}/prepare`. Base MCP submits it through `send_calls`, the user approves in Base Account, and Vesper verifies the receipt and `ScarAnchored` event. Vesper never holds a key. Base is a proof anchor, not the primary memory store. `contracts/ScarAnchor.sol` emits `ScarAnchored(bytes32 scarHash, string scarId, ...)`. Keep `BASE_DEMO_TX_HASH` only as a verifier after a real MCP transaction; never use a placeholder hash in the submission.
 
 The UI links confirmed anchors to the correct Base or Base Sepolia explorer and displays the number of anchored scars from `/identity`.
 
@@ -66,7 +66,7 @@ The UI links confirmed anchors to the correct Base or Base Sepolia explorer and 
 
 FastAPI docs: `/docs`
 
-Core endpoints: `/agent/decide`, `/agent/outcome`, `/scenarios`, `/scars`, `/scars/{id}/anchor`, `/decisions`, `/state/hot`, `/identity`, `/health`, `/demo/disable-memory`, `/demo/seed-failure`, `/demo/enable-memory`, and `/demo/fresh-session`.
+Core endpoints: `/agent/decide`, `/agent/outcome`, `/scenarios`, `/scars`, `/scars/{id}/prepare`, `/scars/{id}/anchor`, `/decisions`, `/state/hot`, `/identity`, `/health`, `/demo/disable-memory`, `/demo/seed-failure`, `/demo/enable-memory`, and `/demo/fresh-session`.
 
 ## Submission checklist
 

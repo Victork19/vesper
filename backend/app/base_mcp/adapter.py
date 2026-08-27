@@ -1,6 +1,5 @@
 import hashlib, json, os, re, urllib.request
 from ..memory.models import AnchorResult
-from .client import BaseMCPClient
 
 TX_RE=re.compile(r'^0x[a-fA-F0-9]{64}$')
 
@@ -31,6 +30,13 @@ class BaseMCPAdapter:
         matching=[log for log in result.get('logs',[]) if (not contract or (log.get('address') or '').lower()==contract) and log.get('topics',[None])[0]==event_topic and len(log.get('topics',[]))>1 and log['topics'][1].lower()==scar_hash.lower()]
         if not matching:return None
         return result
+    def _calldata(self,scar,digest=None):
+        digest=digest or self._canonical_hash(scar)
+        from eth_hash.auto import keccak
+        from eth_abi import encode
+        return '0x'+(keccak(b'anchor(bytes32,string)')[:4]+encode(['bytes32','string'],[bytes.fromhex(digest[2:]),scar.id])).hex()
+    def prepare(self,scar):
+        return {'to':os.getenv('BASE_ANCHOR_CONTRACT',''),'value':'0x0','data':self._calldata(scar),'chainId':8453}
     def anchor(self,scar):
         digest=self._canonical_hash(scar); tx=os.getenv('BASE_DEMO_TX_HASH')
         if tx:
@@ -40,10 +46,4 @@ class BaseMCPAdapter:
                     return AnchorResult(scar_id=scar.id,canonical_hash=digest,transaction_hash=tx,explorer_url=self._explorer(tx),status='confirmed')
             except Exception: pass
             return AnchorResult(scar_id=scar.id,canonical_hash=digest,status='awaiting_chain_verification')
-        if os.getenv('BASE_MCP_ACCESS_TOKEN'):
-            from eth_hash.auto import keccak
-            from eth_abi import encode
-            calldata='0x'+(keccak(b'anchor(bytes32,string)')[:4]+encode(['bytes32','string'],[bytes.fromhex(digest[2:]),scar.id])).hex()
-            pending=BaseMCPClient().prepare_anchor(scar,calldata)
-            return AnchorResult(scar_id=scar.id,canonical_hash=digest,approval_url=pending.get('approval_url'),request_id=pending.get('request_id'),status=pending['status'])
-        return AnchorResult(scar_id=scar.id,canonical_hash=digest,status='awaiting_wallet_approval')
+        return AnchorResult(scar_id=scar.id,canonical_hash=digest,status='awaiting_mcp_transaction')
