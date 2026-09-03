@@ -81,6 +81,18 @@ class BaseMCPAdapter:
             except Exception: pass
             return AnchorResult(scar_id=scar.id,canonical_hash=digest,status='awaiting_chain_verification')
         return AnchorResult(scar_id=scar.id,canonical_hash=digest,status='awaiting_mcp_transaction')
+    def reconcile_demo_anchor(self,scars):
+        tx=os.getenv('BASE_DEMO_TX_HASH','')
+        if not TX_RE.fullmatch(tx):return None
+        target=os.getenv('BASE_DEMO_SCAR_ID','')
+        candidates=[scar for scar in scars if not target or scar.id==target]
+        for scar in candidates:
+            if scar.onchain_tx==tx:return scar
+            result=self.anchor(scar)
+            if result.status=='confirmed':
+                scar.anchor_status=result.status; scar.onchain_tx=result.transaction_hash; scar.onchain_hash=result.canonical_hash
+                return scar
+        return None
     def verify(self,scar,transaction_hash,operator_address):
         digest=self._canonical_hash(scar)
         receipt=self._receipt(transaction_hash,digest,scar.id,operator_address)

@@ -91,6 +91,13 @@ Configure a real deployed `ScarAnchor` address in `BASE_ANCHOR_CONTRACT`.
 bytecode. A Reown project ID is separate: it configures the frontend wallet
 modal and does not make the backend anchor ready.
 
+For a previously confirmed demo transaction, set `BASE_DEMO_TX_HASH` to its
+public Base transaction hash. On the next `/identity` request Vesper verifies
+the receipt and event against the current scar before saving it, so the verified
+anchor count and Basescan link remain connected to the demo. Set
+`BASE_DEMO_SCAR_ID` when the hash belongs to a specific scar. Never use a hash
+that was not produced by the configured `ScarAnchor` contract.
+
 ## Repository map
 
 | Area | Location |
