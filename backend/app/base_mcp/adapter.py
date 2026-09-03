@@ -1,20 +1,30 @@
-import hashlib, json, os, re, urllib.request
+import hashlib, json, os, re, urllib.error, urllib.request
 from ..memory.models import AnchorResult
 
 TX_RE=re.compile(r'^0x[a-fA-F0-9]{64}$')
 ADDRESS_RE=re.compile(r'^0x[a-fA-F0-9]{40}$')
 
 class BaseMCPAdapter:
-    def is_ready(self):
+    def readiness(self):
         rpc=os.getenv('BASE_RPC_URL','https://mainnet.base.org'); contract=os.getenv('BASE_ANCHOR_CONTRACT','')
-        if not ADDRESS_RE.match(contract):return False
+        if not ADDRESS_RE.fullmatch(contract):return False,'BASE_ANCHOR_CONTRACT is missing or invalid.'
         try:
             def call(method,params=[]):
                 body=json.dumps({'jsonrpc':'2.0','id':1,'method':method,'params':params}).encode()
                 req=urllib.request.Request(rpc,body,{'Content-Type':'application/json'})
                 with urllib.request.urlopen(req,timeout=4) as res:return json.loads(res.read()).get('result')
-            return call('eth_chainId')=='0x2105' and call('eth_getCode',[contract,'latest']) not in (None,'0x','0x0')
-        except Exception:return False
+            if call('eth_chainId')!='0x2105':return False,'BASE_RPC_URL is not connected to Base mainnet.'
+            if call('eth_getCode',[contract,'latest']) in (None,'0x','0x0'):return False,'BASE_ANCHOR_CONTRACT has no deployed bytecode on Base mainnet.'
+            from eth_hash.auto import keccak
+            getter='0x'+keccak(b'anchoredAt(bytes32)')[:4].hex()+'00'*32
+            result=call('eth_call',[{'to':contract,'data':getter},'latest'])
+            if not isinstance(result,str) or len(result)<66:return False,'BASE_ANCHOR_CONTRACT does not expose the ScarAnchor interface.'
+            return True,''
+        except urllib.error.HTTPError as exc:return False,f'Base RPC rejected the request ({exc.code}).'
+        except (urllib.error.URLError,TimeoutError):return False,'Base RPC could not be reached.'
+        except Exception:return False,'Base RPC readiness check failed.'
+    def is_ready(self):
+        return self.readiness()[0]
     @staticmethod
     def _explorer(tx):
         host='sepolia.basescan.org' if 'sepolia' in os.getenv('BASE_RPC_URL','') else 'basescan.org'
