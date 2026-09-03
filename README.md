@@ -12,6 +12,11 @@ The product is built around one question:
 Vesper answers with a persistent scar, a safer decision, and a trace that can
 survive a fresh session.
 
+## Live deployment
+
+- **Live demo:** [vesper-scar.pages.dev](https://vesper-scar.pages.dev/)
+- **Backend API:** [vesper-scar.duckdns.org](https://vesper-scar.duckdns.org/)
+
 ## The proof in five steps
 
 The main demo uses the same situation throughout:
