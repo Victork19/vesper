@@ -141,14 +141,20 @@ and verify the contract/source on Basescan before the demo. Do not use a
 placeholder hash. `BASE_DEMO_TX_HASH` is optional and only verifies a real
 MCP-submitted transaction; it is not the execution path.
 
-The Base Account flow is: the frontend calls `wallet_connect` for Base mainnet →
-`GET /scars/{id}/prepare?from=0x...` → the frontend's Base Account provider calls
-`wallet_sendCalls` with the returned `{to,value,data}`
-on chain `0x2105` → user approval in Base Account → frontend polls
-`wallet_getCallsStatus` → `POST /scars/{id}/verify` with the resulting transaction
-hash → Vesper verifies the receipt and `ScarAnchored` event. The same prepared
-call can be submitted by a connected Base MCP host with `send_calls`; the host
-owns its own authentication and approval UI.
+The browser proof flow defaults to a normal Wallet through Reown AppKit. The
+frontend opens Reown’s EVM connection modal, obtains the connected address and
+EIP-1193 provider, switches it to Base mainnet if needed, calls
+`GET /scars/{id}/prepare?from=0x...`, and submits the returned `{to,data,value:0}`
+with `eth_sendTransaction`. After the wallet returns a transaction hash, the
+frontend calls `POST /scars/{id}/verify`; Vesper verifies the receipt and
+`ScarAnchored` event. The secondary Base Account path calls `wallet_connect`,
+submits the same prepared call with `wallet_sendCalls`, polls
+`wallet_getCallsStatus`, and then uses the same verify endpoint. The same prepared
+call can also be submitted by a connected Base MCP host with `send_calls`; the
+host owns its own authentication and approval UI.
+
+Set the frontend `VITE_REOWN_PROJECT_ID` to a project ID from the Reown Dashboard,
+and add the deployed frontend origin to that project’s allowed domains.
 
 ```env
 BASE_MCP_URL=https://mcp.base.org

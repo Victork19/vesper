@@ -58,16 +58,21 @@ The backend uses the official Sibyl client as its only memory layer. The deletio
 
 ## Base proof
 
-Base MCP is the execution layer. Vesper prepares `ScarAnchor` calldata at `GET /scars/{id}/prepare`. Base MCP submits it through `send_calls`, the user approves in Base Account, and Vesper verifies the receipt and `ScarAnchored` event. Vesper never holds a key. Base is a proof anchor, not the primary memory store. `contracts/ScarAnchor.sol` emits `ScarAnchored(bytes32 scarHash, string scarId, ...)`. Keep `BASE_DEMO_TX_HASH` only as a verifier after a real MCP transaction; never use a placeholder hash in the submission.
+Base is a proof anchor, not the primary memory store. Vesper prepares `ScarAnchor`
+calldata at `GET /scars/{id}/prepare` and never holds a key. The UI has one
+`Anchor on Base` action: the default Wallet path opens Reown AppKit for MetaMask,
+OKX, Rabby, and other supported wallets, then submits the returned EIP-1193
+provider transaction. Base Account remains the optional MCP / Base App path using
+`wallet_sendCalls` and approval. Both paths submit the resulting hash to
+`POST /scars/{id}/verify`. Vesper only marks an anchor confirmed after checking the
+receipt and matching `ScarAnchored(scarHash, scarId)`, then links it to the correct
+Base explorer. `contracts/ScarAnchor.sol` emits
+`ScarAnchored(bytes32 scarHash, string scarId, ...)`. Keep `BASE_DEMO_TX_HASH` only
+as a verifier after a real MCP transaction; never use a placeholder hash.
 
-The UI loads the official Base Account SDK, connects the operator's Base Account
-with `wallet_connect` (including Sign in with Ethereum on Base mainnet), and calls
-`wallet_sendCalls` with the calldata returned by `/prepare`, then polls
-`wallet_getCallsStatus`, and submits the confirmed transaction to
-`POST /scars/{id}/verify`. Vesper only marks an anchor confirmed after checking
-the receipt and matching `ScarAnchored(scarHash, scarId)`. The UI links confirmed
-anchors to the correct Base explorer and displays the number of anchored scars
-from `/identity`.
+Set `VITE_REOWN_PROJECT_ID` in the frontend deployment from a project created in
+the [Reown Dashboard](https://dashboard.reown.com/). Configure the deployed site
+origin in that project as well.
 
 ## API
 
