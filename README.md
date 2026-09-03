@@ -1,42 +1,168 @@
 # Vesper
 
-Vesper is a decision firewall for autonomous agents handling irreversible actions. It stores meaningful failures as permanent scars, turns them into rules, cooldowns, and trust changes, and cites those scars before the agent repeats a risky decision.
+Vesper is a decision firewall for autonomous agents. It turns consequential
+failures into durable memory, recalls that memory before the next decision, and
+can anchor the resulting scar on Base as independently verifiable proof.
 
-The problem is simple: autonomous systems can act faster than they can learn. Vesper gives them durable operational memory. A transfer, production deploy, or treasury payment that fails once becomes a constraint on what happens next.
+The product is built around one question:
 
-## Judge path: verify the gate in under two minutes
+> When an agent has already failed this way, what should stop it from doing the
+> same thing again?
 
-1. Open the live site. The chrome shows memory state, scar count, trust, cooldowns, network, and Base proof status.
-2. Click `Disable memory`. The status must become `MEMORY DISABLED`.
-3. Choose a failure class: irreversible transfer, production deploy, or treasury payment.
-4. Click `Run same decision` for the selected situation. This is the naive baseline and should show `No scars recalled`.
-5. Record the outcome or use `Create scar`, then `Enable memory`.
-6. Restart the backend while keeping the Sibyl memory path, then run the exact same situation again. The decision now cites the scar and should become safer (`DO NOTHING` or `REFUSE / REQUEST MORE EVIDENCE`).
-7. On the scar, click `Anchor on Base`. The UI only shows a network-correct explorer link after the exact `ScarAnchored` event and scar hash are verified.
+Vesper answers with a persistent scar, a safer decision, and a trace that can
+survive a fresh session.
 
-This is the continuous deletion beat to record: same situation, memory off, baseline decision, scar write, memory on, same decision, visible citation.
+## The proof in five steps
 
-## What to inspect
+The main demo uses the same situation throughout:
 
-| Proof | Location |
+1. Disable learning memory. Active scars are deleted from recall and the UI
+   shows `MEMORY DISABLED`.
+2. Run the decision once. This is the memory-off baseline and should produce
+   the naive action.
+3. Record a failure. Vesper writes the lesson to Sibyl as a scar.
+4. Enable memory again.
+5. Run a fresh-session decision with the same situation. The agent should cite
+   the scar and choose a safer action, such as refusing or requesting more
+   evidence.
+
+The important comparison is not a static before-and-after screenshot. It is
+the same decision with memory off and then with persisted memory recalled.
+
+## How Vesper works
+
+```text
+decision request
+      |
+      v
+recall scars and principles ---> safety gate ---> action
+      ^                                      |
+      |                                      v
+  Sibyl memory <--- failure / outcome <--- result
+      |
+      v
+optional Base proof of the scar
+```
+
+The backend uses the official `sibyl-memory-client` as its memory layer. Vesper
+maps its memory model into Sibyl tiers:
+
+| Tier | Role |
 | --- | --- |
-| Memory deletion | `backend/app/memory/sibyl.py`, `POST /demo/disable-memory` |
-| Memory-off behavior | `backend/app/agent/loop.py`, `HotState.memory_enabled` |
-| Scar write/read | `backend/app/agent/scars.py`, `backend/app/memory/sibyl.py` |
-| Decision citation | `backend/app/agent/decision.py`, `DecisionRecord.cited_scars` |
-| Tiered persistence | `SibylMemory`: HOT, WARM, COLD, REFERENCE, ARCHIVE |
-| Base anchor | `contracts/ScarAnchor.sol`, `backend/app/base_mcp/adapter.py`, `GET /scars/{id}/prepare`, `POST /scars/{id}/anchor` |
-| Frontend proof | `frontend/src/main.tsx` |
+| HOT | Current memory state, trust, constraints, and cooldowns |
+| WARM | Active scars and consolidated principles |
+| COLD | Decision and event journal |
+| REFERENCE | Constitution and hard limits |
+| ARCHIVE | Retained records outside active recall |
+
+Deleting learning memory is explicit: the learning records are removed, the
+journal remains for auditability, and recall stays disabled until memory is
+enabled again.
+
+## Base anchoring
+
+Base is the proof layer, not Vesper's memory store. Vesper prepares a
+`ScarAnchor.anchor()` transaction; a user-controlled signer approves it. Vesper
+never holds a private key.
+
+The UI intentionally has one action:
+
+```text
+Anchor this scar on Base
+[ Anchor on Base ]
+```
+
+After clicking it, the user chooses a signer:
+
+- **Wallet** — the default path, using Reown AppKit for MetaMask, OKX, Rabby,
+  and other supported wallets.
+- **Base Account** — the optional MCP / Base App path using `wallet_sendCalls`.
+
+Both paths use the same backend flow:
+
+1. `GET /scars/{id}/prepare?from=connectedAddress`
+2. The selected signer submits `ScarAnchor.anchor()` on Base mainnet.
+3. `POST /scars/{id}/verify` receives the transaction hash.
+4. Vesper verifies the receipt and `ScarAnchored` event before showing one
+   Basescan link.
+
+Configure a real deployed `ScarAnchor` address in `BASE_ANCHOR_CONTRACT`.
+`BASE_RPC_URL` must point to Base mainnet and the address must contain deployed
+bytecode. A Reown project ID is separate: it configures the frontend wallet
+modal and does not make the backend anchor ready.
+
+## Repository map
+
+| Area | Location |
+| --- | --- |
+| FastAPI application | `backend/app/main.py` |
+| Sibyl memory adapter | `backend/app/memory/sibyl.py` |
+| Decision and recall loop | `backend/app/agent/loop.py` |
+| Base preparation and verification | `backend/app/base_mcp/adapter.py` |
+| Anchor contract | `contracts/ScarAnchor.sol` |
+| React/Vite frontend | `frontend/src/main.tsx` |
+| Frontend styling | `frontend/src/styles.css` |
+| Docker deployment | `backend/docker-compose.yml` |
 
 ## Run locally
 
+Prerequisites: Python 3.11+, Node.js, and npm.
+
+### 1. Configure the backend
+
+From the repository root:
+
 ```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+cp backend/.env.example backend/.env
 ```
 
+Set at least these values for Base anchoring:
+
+```env
+CORS_ORIGINS=http://localhost:5173
+BASE_RPC_URL=https://mainnet.base.org
+BASE_ANCHOR_CONTRACT=0xYOUR_DEPLOYED_MAINNET_SCAR_ANCHOR
+SIBYL_MEMORY_PATH=./data/sibyl-memory.db
+SIBYL_TENANT_ID=vesper
+```
+
+`BASE_ANCHOR_CONTRACT` must be the deployed `ScarAnchor` contract, not a wallet
+or Base Account address. Never commit `.env` files, private keys, API keys, or
+memory databases.
+
+Start the API:
+
+```bash
+cd backend
+python -m venv .venv
+# activate .venv using your platform's command
+pip install -r requirements.txt
+uvicorn app.main:app --reload --env-file .env
+```
+
+If you run Uvicorn without `--env-file`, export the variables in the shell
+first. Docker Compose loads `backend/.env` automatically.
+
+### 2. Configure the frontend
+
 In another terminal:
+
+```bash
+cp frontend/.env.example frontend/.env
+```
+
+Set the API URL and a Reown project ID:
+
+```env
+VITE_API_URL=http://localhost:8000
+VITE_REOWN_PROJECT_ID=your-reown-project-id
+```
+
+Create the project in the [Reown Dashboard](https://dashboard.reown.com/) and
+add the deployed frontend origin to its allowlist. The wallet connection uses
+Reown; the frontend does not use a separate browser-injected wallet provider.
+
+Start the frontend:
 
 ```bash
 cd frontend
@@ -44,66 +170,47 @@ npm install
 npm run dev
 ```
 
-The frontend defaults to `http://localhost:8000`. For deployment set `VITE_API_URL` and optionally `VITE_GITHUB_URL`.
+Open the Vite URL shown in the terminal, usually `http://localhost:5173`.
 
-## Memory architecture
+## API surface
 
-- HOT: trust, memory-enabled state, active constraints, and cooldowns.
-- WARM: scars and consolidated principles.
-- COLD: immutable decision/event journal.
-- REFERENCE: constitution and hard limits.
-- ARCHIVE: retained records removed from active recall.
+FastAPI's interactive documentation is available at `/docs`.
 
-The backend uses the official Sibyl client as its only memory layer. The deletion endpoint removes learning memory and explicitly switches recall off; it does not silently claim that memory still exists.
+Core endpoints:
 
-## Base proof
+```text
+GET  /health
+GET  /identity
+GET  /scenarios
+GET  /scars
+GET  /principles
+GET  /decisions
+GET  /state/hot
+POST /agent/decide
+POST /agent/outcome
+GET  /scars/{id}/prepare
+POST /scars/{id}/anchor       # MCP / server-side path
+POST /scars/{id}/verify       # wallet and Base Account verification
+POST /demo/disable-memory
+POST /demo/enable-memory
+POST /demo/seed-failure
+POST /demo/fresh-session
+```
 
-Base is a proof anchor, not the primary memory store. Vesper prepares `ScarAnchor`
-calldata at `GET /scars/{id}/prepare` and never holds a key. The UI has one
-`Anchor on Base` action: the default Wallet path opens Reown AppKit for MetaMask,
-OKX, Rabby, and other supported wallets, then submits the returned EIP-1193
-provider transaction. Base Account remains the optional MCP / Base App path using
-`wallet_sendCalls` and approval. Both paths submit the resulting hash to
-`POST /scars/{id}/verify`. Vesper only marks an anchor confirmed after checking the
-receipt and matching `ScarAnchored(scarHash, scarId)`, then links it to the correct
-Base explorer. `contracts/ScarAnchor.sol` emits
-`ScarAnchored(bytes32 scarHash, string scarId, ...)`. Keep `BASE_DEMO_TX_HASH` only
-as a verifier after a real MCP transaction; never use a placeholder hash.
+For a configured Base deployment, `/identity` should report:
 
-Set `VITE_REOWN_PROJECT_ID` in the frontend deployment from a project created in
-the [Reown Dashboard](https://dashboard.reown.com/). Configure the deployed site
-origin in that project as well.
+```json
+{
+  "network": "Base",
+  "anchor_ready": true
+}
+```
 
-## API
+If `anchor_ready` is false, check the backend process environment, the RPC
+chain ID, and whether `BASE_ANCHOR_CONTRACT` has deployed bytecode on Base
+mainnet. The readiness check intentionally fails closed.
 
-FastAPI docs: `/docs`
-
-Core endpoints: `/agent/decide`, `/agent/outcome`, `/scenarios`, `/scars`, `/scars/{id}/prepare`, `/scars/{id}/anchor`, `/scars/{id}/verify`, `/decisions`, `/state/hot`, `/identity`, `/health`, `/demo/disable-memory`, `/demo/seed-failure`, `/demo/enable-memory`, and `/demo/fresh-session`.
-
-## Submission checklist
-
-- Record the deletion test continuously with the same situation and both outcomes visible.
-- Show the commit or timestamp during the recording.
-- Show a real confirmed Base mainnet transaction in the scar card and open its Basescan link.
-- Show a real backend restart and fresh-session recall.
-- Include a short Prior Work declaration and two public build posts.
-- Keep the video focused on the decision firewall: failure, memory, changed action, and proof.
-
-## Memory implementation note
-
-Production uses `sibyl-memory-client` as the only store. `SibylMemory` maps
-Vesper's tiers to Sibyl entities, state documents, reference documents, and
-journal events. Decision recall reads from Sibyl WARM entities and COLD
-events; `/demo/disable-memory` deletes learning entities in Sibyl and leaves
-only the explicit disabled HOT state.
-
-The strongest proof is a fresh backend process: create the scar, stop and
-restart the API, then run the same situation. The decision must cite the scar
-and change its action. The health endpoint exposes `memory_source`,
-`official_sibyl`, and `llm_enabled` so the recording can prove which path is
-running.
-
-## Development checks
+## Checks
 
 ```bash
 cd backend
@@ -112,22 +219,28 @@ python -m pytest -q
 python -m compileall -q app
 ```
 
-Base anchors are only displayed as confirmed after a successful Base RPC
-receipt check. Set `BASE_RPC_URL` and `BASE_ANCHOR_CONTRACT` in deployment;
-never use a placeholder transaction hash.
+Build the frontend with:
 
-## Product-market focus
+```bash
+cd frontend
+npm ci
+npm run build
+```
 
-Vesper is designed for autonomous-agent operators, crypto treasury teams, DAO
-multisig operators, and production teams that approve irreversible actions.
-The initial wedge is a decision firewall: Vesper sits between an agent's
-proposal and execution, requiring stronger evidence when the agent's own
-history says a class of action has failed before.
+## Deployment
 
-## Prior Work declaration
+The supported layout is a Dockerized FastAPI backend with persistent storage
+and a Cloudflare Pages frontend. See [DEPLOYMENT.md](DEPLOYMENT.md) for the
+production runbook, CORS configuration, HTTPS proxy, persistent Sibyl data,
+and Base verification checklist.
+
+The backend must be restarted or recreated after changing its environment.
+The frontend must be rebuilt after changing `VITE_API_URL` or
+`VITE_REOWN_PROJECT_ID`, because Vite embeds those values at build time.
+
+## Project status
 
 Vesper was built for the Sibyl Labs Hackathon. It uses the official
 `sibyl-memory-client` package and the open-source Base contract and MCP
-interfaces documented in this repository. No Sibyl reference build was copied
-as the product; Vesper's scars, principles, decision lifecycle, UI, and proof
-workflow are original to this project.
+interfaces documented in this repository. The scars, principles, decision
+lifecycle, UI, and proof workflow are original to this project.
